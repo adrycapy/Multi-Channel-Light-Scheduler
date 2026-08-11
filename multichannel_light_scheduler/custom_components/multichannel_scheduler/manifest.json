@@ -1,0 +1,12 @@
+{
+  "domain": "multichannel_scheduler",
+  "name": "Multichannel Light Scheduler",
+  "version": "0.1.0",
+  "documentation": "https://github.com/example/multichannel-light-scheduler",
+  "issue_tracker": "https://github.com/example/multichannel-light-scheduler/issues",
+  "codeowners": ["@maintainer"],
+  "config_flow": true,
+  "iot_class": "local_push",
+  "requirements": [],
+  "dependencies": ["frontend", "websocket_api"]
+}

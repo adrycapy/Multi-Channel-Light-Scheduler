@@ -1,0 +1,9 @@
+{
+  "name": "Multichannel Light Scheduler",
+  "content_in_root": false,
+  "render_readme": true,
+  "homeassistant": "2024.6.0",
+  "domains": ["multichannel_scheduler"],
+  "country": "ALL",
+  "filename": "dist/multichannel-scheduler-card.js"
+}
