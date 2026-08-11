@@ -28,10 +28,14 @@ export class MultichannelSchedulerCard extends LitElement {
 
   public setConfig(config: CardConfig): void {
     this.config = config;
-    this.channels = (config.channels ?? []).slice().sort((a, b) => a.id - b.id);
+    const configChannels = (config.channels ?? []).slice().sort((a, b) => a.id - b.id);
+    if (configChannels.length > 0) {
+      this.channels = configChannels;
+    }
 
-    if (this.channels.length > 0) {
-      this.activeChannelId = config.active_channel_id ?? this.channels[0].id;
+    const channels = this.effectiveChannels;
+    if (channels.length > 0) {
+      this.activeChannelId = config.active_channel_id ?? channels[0].id;
     }
   }
 
@@ -54,7 +58,7 @@ export class MultichannelSchedulerCard extends LitElement {
 
         <div class="content">
           <multichannel-chart-canvas
-            .channels=${this.channels}
+            .channels=${this.effectiveChannels}
             .nodes=${this.nodes}
             .selectedIndex=${this.selectedIndex}
             .activeChannelId=${this.activeChannelId}
@@ -97,7 +101,7 @@ export class MultichannelSchedulerCard extends LitElement {
           <input type="time" step="1" .value=${node.time} @input=${this.onTimeChanged} />
         </div>
 
-        ${this.channels.map((channel) => {
+        ${this.effectiveChannels.map((channel) => {
           const key = String(channel.id);
           const value = Number(node.values[key] ?? 0);
           return html`
@@ -129,9 +133,10 @@ export class MultichannelSchedulerCard extends LitElement {
   }
 
   private renderActiveChannelSelector(): TemplateResult {
+    const channels = this.effectiveChannels;
     return html`
       <select .value=${String(this.activeChannelId)} @change=${this.onActiveChannelChanged}>
-        ${this.channels.map(
+        ${channels.map(
           (channel) => html`<option value=${String(channel.id)}>${channel.name}</option>`
         )}
       </select>
@@ -286,14 +291,15 @@ export class MultichannelSchedulerCard extends LitElement {
   }
 
   private async saveNow(): Promise<void> {
-    if (!this.hass || this.channels.length === 0) {
+    const channels = this.effectiveChannels;
+    if (!this.hass || channels.length === 0) {
       return;
     }
 
     const payload: SchedulerPayload = {
       version: 1,
-      config: { channels: this.channels },
-      nodes: this.normalizeNodes(this.nodes),
+      config: { channels },
+      nodes: this.normalizeNodesForChannels(this.nodes, channels),
     };
 
     await this.savePayload(payload);
@@ -409,6 +415,15 @@ export class MultichannelSchedulerCard extends LitElement {
     const scale = Number(this.config.chart_scale ?? 1);
     const normalized = Number.isFinite(scale) ? Math.max(0.8, Math.min(2, scale)) : 1;
     return Math.max(8, Math.round(8 * normalized));
+  }
+
+  private get effectiveChannels(): ChannelConfig[] {
+    const configChannels = (this.config.channels ?? []).slice().sort((a, b) => a.id - b.id);
+    if (configChannels.length > 0) {
+      return configChannels;
+    }
+
+    return this.channels.slice().sort((a, b) => a.id - b.id);
   }
 }
 

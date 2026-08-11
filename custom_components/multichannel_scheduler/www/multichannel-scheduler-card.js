@@ -551,9 +551,13 @@ let MultichannelSchedulerCard = class MultichannelSchedulerCard extends i {
     static { this.styles = [cardStyles]; }
     setConfig(config) {
         this.config = config;
-        this.channels = (config.channels ?? []).slice().sort((a, b) => a.id - b.id);
-        if (this.channels.length > 0) {
-            this.activeChannelId = config.active_channel_id ?? this.channels[0].id;
+        const configChannels = (config.channels ?? []).slice().sort((a, b) => a.id - b.id);
+        if (configChannels.length > 0) {
+            this.channels = configChannels;
+        }
+        const channels = this.effectiveChannels;
+        if (channels.length > 0) {
+            this.activeChannelId = config.active_channel_id ?? channels[0].id;
         }
     }
     willUpdate(changedProps) {
@@ -574,7 +578,7 @@ let MultichannelSchedulerCard = class MultichannelSchedulerCard extends i {
 
         <div class="content">
           <multichannel-chart-canvas
-            .channels=${this.channels}
+            .channels=${this.effectiveChannels}
             .nodes=${this.nodes}
             .selectedIndex=${this.selectedIndex}
             .activeChannelId=${this.activeChannelId}
@@ -614,7 +618,7 @@ let MultichannelSchedulerCard = class MultichannelSchedulerCard extends i {
           <input type="time" step="1" .value=${node.time} @input=${this.onTimeChanged} />
         </div>
 
-        ${this.channels.map((channel) => {
+        ${this.effectiveChannels.map((channel) => {
             const key = String(channel.id);
             const value = Number(node.values[key] ?? 0);
             return b `
@@ -645,9 +649,10 @@ let MultichannelSchedulerCard = class MultichannelSchedulerCard extends i {
     `;
     }
     renderActiveChannelSelector() {
+        const channels = this.effectiveChannels;
         return b `
       <select .value=${String(this.activeChannelId)} @change=${this.onActiveChannelChanged}>
-        ${this.channels.map((channel) => b `<option value=${String(channel.id)}>${channel.name}</option>`)}
+        ${channels.map((channel) => b `<option value=${String(channel.id)}>${channel.name}</option>`)}
       </select>
     `;
     }
@@ -776,13 +781,14 @@ let MultichannelSchedulerCard = class MultichannelSchedulerCard extends i {
         }
     }
     async saveNow() {
-        if (!this.hass || this.channels.length === 0) {
+        const channels = this.effectiveChannels;
+        if (!this.hass || channels.length === 0) {
             return;
         }
         const payload = {
             version: 1,
-            config: { channels: this.channels },
-            nodes: this.normalizeNodes(this.nodes),
+            config: { channels },
+            nodes: this.normalizeNodesForChannels(this.nodes, channels),
         };
         await this.savePayload(payload);
     }
@@ -882,6 +888,13 @@ let MultichannelSchedulerCard = class MultichannelSchedulerCard extends i {
         const scale = Number(this.config.chart_scale ?? 1);
         const normalized = Number.isFinite(scale) ? Math.max(0.8, Math.min(2, scale)) : 1;
         return Math.max(8, Math.round(8 * normalized));
+    }
+    get effectiveChannels() {
+        const configChannels = (this.config.channels ?? []).slice().sort((a, b) => a.id - b.id);
+        if (configChannels.length > 0) {
+            return configChannels;
+        }
+        return this.channels.slice().sort((a, b) => a.id - b.id);
     }
 };
 __decorate([
