@@ -30,6 +30,7 @@ class IntegrationRuntime:
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the integration from yaml (unused)."""
     hass.data.setdefault(DOMAIN, {})
+    await _async_register_frontend_resource(hass)
     return True
 
 
