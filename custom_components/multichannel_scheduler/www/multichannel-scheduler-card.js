@@ -73,10 +73,8 @@ const t=t=>(e,o)=>{ void 0!==o?o.addInitializer(()=>{customElements.define(t,e);
  */function r(r){return n({...r,state:true,attribute:false})}
 
 const WIDTH = 1200;
-const HEIGHT = 420;
-const PADDING = { left: 52, right: 18, top: 20, bottom: 34 };
-const PLOT_WIDTH = WIDTH - PADDING.left - PADDING.right;
-const PLOT_HEIGHT = HEIGHT - PADDING.top - PADDING.bottom;
+const BASE_HEIGHT = 420;
+const BASE_PADDING = { left: 52, right: 18, top: 20, bottom: 34 };
 const MAX_SECONDS = 24 * 60 * 60 - 1;
 let MultichannelChartCanvas = class MultichannelChartCanvas extends i {
     constructor() {
@@ -85,6 +83,7 @@ let MultichannelChartCanvas = class MultichannelChartCanvas extends i {
         this.nodes = [];
         this.selectedIndex = -1;
         this.activeChannelId = 1;
+        this.chartScale = 1;
         this.dragIndex = -1;
         this.pointerMoveHandler = (event) => this.onPointerMove(event);
         this.pointerUpHandler = () => this.onPointerUp();
@@ -141,7 +140,7 @@ let MultichannelChartCanvas = class MultichannelChartCanvas extends i {
     render() {
         return b `
       <svg
-        viewBox="0 0 ${WIDTH} ${HEIGHT}"
+        viewBox="0 0 ${WIDTH} ${this.chartHeight}"
         @click=${this.onBackgroundClick}
         role="img"
         aria-label="Multichannel light scheduler chart"
@@ -153,21 +152,25 @@ let MultichannelChartCanvas = class MultichannelChartCanvas extends i {
     renderGrid() {
         const rows = 5;
         const cols = 12;
+        const padding = this.padding;
+        const plotHeight = this.plotHeight;
+        const plotWidth = this.plotWidth;
+        const chartHeight = this.chartHeight;
         return w `
       ${Array.from({ length: rows + 1 }, (_, i) => {
-            const y = PADDING.top + (PLOT_HEIGHT / rows) * i;
+            const y = padding.top + (plotHeight / rows) * i;
             const label = 100 - Math.round((100 / rows) * i);
             return w `
-          <line class="grid" x1="${PADDING.left}" y1="${y}" x2="${WIDTH - PADDING.right}" y2="${y}"></line>
-          <text class="axis-label" x="${PADDING.left - 8}" y="${y + 4}" text-anchor="end">${label}%</text>
+          <line class="grid" x1="${padding.left}" y1="${y}" x2="${WIDTH - padding.right}" y2="${y}"></line>
+          <text class="axis-label" x="${padding.left - 8}" y="${y + 4}" text-anchor="end">${label}%</text>
         `;
         })}
       ${Array.from({ length: cols + 1 }, (_, i) => {
-            const x = PADDING.left + (PLOT_WIDTH / cols) * i;
+            const x = padding.left + (plotWidth / cols) * i;
             const hour = String((24 / cols) * i).padStart(2, "0");
             return w `
-          <line class="grid" x1="${x}" y1="${PADDING.top}" x2="${x}" y2="${PADDING.top + PLOT_HEIGHT}"></line>
-          <text class="axis-label" x="${x}" y="${HEIGHT - 10}" text-anchor="middle">${hour}:00</text>
+          <line class="grid" x1="${x}" y1="${padding.top}" x2="${x}" y2="${padding.top + plotHeight}"></line>
+          <text class="axis-label" x="${x}" y="${chartHeight - 10}" text-anchor="middle">${hour}:00</text>
         `;
         })}
     `;
@@ -348,25 +351,50 @@ let MultichannelChartCanvas = class MultichannelChartCanvas extends i {
     pointerToChart(svgElement, clientX, clientY) {
         const rect = svgElement.getBoundingClientRect();
         const x = ((clientX - rect.left) / rect.width) * WIDTH;
-        const y = ((clientY - rect.top) / rect.height) * HEIGHT;
+        const y = ((clientY - rect.top) / rect.height) * this.chartHeight;
         return { x, y };
     }
     secondsToX(seconds) {
-        return PADDING.left + (Math.max(0, Math.min(MAX_SECONDS, seconds)) / MAX_SECONDS) * PLOT_WIDTH;
+        return this.padding.left + (Math.max(0, Math.min(MAX_SECONDS, seconds)) / MAX_SECONDS) * this.plotWidth;
     }
     xToSeconds(x) {
-        const clampedX = Math.max(PADDING.left, Math.min(WIDTH - PADDING.right, x));
-        const ratio = (clampedX - PADDING.left) / PLOT_WIDTH;
+        const clampedX = Math.max(this.padding.left, Math.min(WIDTH - this.padding.right, x));
+        const ratio = (clampedX - this.padding.left) / this.plotWidth;
         return Math.round(ratio * MAX_SECONDS);
     }
     valueToY(value) {
         const clamped = Math.max(0, Math.min(100, value));
-        return PADDING.top + ((100 - clamped) / 100) * PLOT_HEIGHT;
+        return this.padding.top + ((100 - clamped) / 100) * this.plotHeight;
     }
     yToValue(y) {
-        const clampedY = Math.max(PADDING.top, Math.min(PADDING.top + PLOT_HEIGHT, y));
-        const ratio = (clampedY - PADDING.top) / PLOT_HEIGHT;
+        const clampedY = Math.max(this.padding.top, Math.min(this.padding.top + this.plotHeight, y));
+        const ratio = (clampedY - this.padding.top) / this.plotHeight;
         return Math.max(0, Math.min(100, Math.round(100 - ratio * 100)));
+    }
+    get normalizedScale() {
+        const scale = Number(this.chartScale);
+        if (!Number.isFinite(scale)) {
+            return 1;
+        }
+        return Math.max(0.8, Math.min(2, scale));
+    }
+    get chartHeight() {
+        return Math.round(BASE_HEIGHT * this.normalizedScale);
+    }
+    get padding() {
+        const scale = this.normalizedScale;
+        return {
+            left: BASE_PADDING.left * scale,
+            right: BASE_PADDING.right * scale,
+            top: BASE_PADDING.top * scale,
+            bottom: BASE_PADDING.bottom * scale,
+        };
+    }
+    get plotWidth() {
+        return WIDTH - this.padding.left - this.padding.right;
+    }
+    get plotHeight() {
+        return this.chartHeight - this.padding.top - this.padding.bottom;
     }
     timeToSeconds(time) {
         const [h, m, s] = time.split(":").map((part) => Number(part));
@@ -392,6 +420,9 @@ __decorate([
 __decorate([
     n({ type: Number })
 ], MultichannelChartCanvas.prototype, "activeChannelId", void 0);
+__decorate([
+    n({ type: Number })
+], MultichannelChartCanvas.prototype, "chartScale", void 0);
 __decorate([
     r()
 ], MultichannelChartCanvas.prototype, "dragIndex", void 0);
@@ -547,6 +578,7 @@ let MultichannelSchedulerCard = class MultichannelSchedulerCard extends i {
             .nodes=${this.nodes}
             .selectedIndex=${this.selectedIndex}
             .activeChannelId=${this.activeChannelId}
+            .chartScale=${this.config.chart_scale ?? 1}
             @nodes-changed=${this.onNodesChanged}
             @node-selected=${this.onNodeSelected}
           ></multichannel-chart-canvas>
@@ -697,17 +729,37 @@ let MultichannelSchedulerCard = class MultichannelSchedulerCard extends i {
             const payload = (await this.hass.callWS({ type: WS_GET_CONFIG }));
             const backendChannels = payload.config?.channels ?? [];
             const backendNodes = payload.nodes ?? [];
-            if (backendChannels.length > 0) {
+            const configChannels = (this.config.channels ?? []).slice().sort((a, b) => a.id - b.id);
+            // YAML card configuration is the source of truth for channel definitions.
+            if (configChannels.length > 0) {
+                const normalizedNodes = this.normalizeNodesForChannels(backendNodes.length > 0 ? backendNodes : this.defaultNodes(configChannels), configChannels);
+                this.channels = configChannels;
+                this.nodes = normalizedNodes;
+                if (!this.areChannelsEqual(backendChannels, configChannels) ||
+                    !this.areNodesCompatibleWithChannels(backendNodes, configChannels)) {
+                    await this.savePayload({
+                        version: 1,
+                        config: { channels: configChannels },
+                        nodes: normalizedNodes,
+                    });
+                }
+            }
+            else if (backendChannels.length > 0) {
                 this.channels = backendChannels;
+                this.nodes = this.normalizeNodes(backendNodes.length > 0 ? backendNodes : this.defaultNodes(backendChannels));
             }
             else if (this.channels.length > 0) {
+                const fallbackNodes = this.defaultNodes(this.channels);
+                this.nodes = fallbackNodes;
                 await this.savePayload({
                     version: 1,
                     config: { channels: this.channels },
-                    nodes: this.defaultNodes(this.channels),
+                    nodes: fallbackNodes,
                 });
             }
-            this.nodes = this.normalizeNodes(backendNodes.length > 0 ? backendNodes : this.defaultNodes(this.channels));
+            else {
+                this.nodes = [];
+            }
             if (this.channels.length > 0) {
                 const hasActive = this.channels.some((channel) => channel.id === this.activeChannelId);
                 if (!hasActive) {
@@ -752,6 +804,44 @@ let MultichannelSchedulerCard = class MultichannelSchedulerCard extends i {
             .sort((a, b) => this.timeToSeconds(a.time) - this.timeToSeconds(b.time));
         return normalized;
     }
+    normalizeNodesForChannels(nodes, channels) {
+        const channelKeys = channels.map((channel) => String(channel.id));
+        return this.normalizeNodes(nodes).map((node) => {
+            const values = {};
+            for (const key of channelKeys) {
+                const raw = Number(node.values[key] ?? 0);
+                values[key] = Math.max(0, Math.min(100, Math.round(Number.isFinite(raw) ? raw : 0)));
+            }
+            return {
+                time: node.time,
+                values,
+            };
+        });
+    }
+    areChannelsEqual(a, b) {
+        if (a.length !== b.length) {
+            return false;
+        }
+        const sa = a.slice().sort((x, y) => x.id - y.id);
+        const sb = b.slice().sort((x, y) => x.id - y.id);
+        return sa.every((channel, index) => {
+            const other = sb[index];
+            return (channel.id === other.id &&
+                channel.entity_id === other.entity_id &&
+                channel.name === other.name &&
+                channel.color.toUpperCase() === other.color.toUpperCase());
+        });
+    }
+    areNodesCompatibleWithChannels(nodes, channels) {
+        const keys = new Set(channels.map((channel) => String(channel.id)));
+        return nodes.every((node) => {
+            const nodeKeys = Object.keys(node.values ?? {});
+            if (nodeKeys.length !== keys.size) {
+                return false;
+            }
+            return nodeKeys.every((key) => keys.has(String(key)));
+        });
+    }
     defaultNodes(channels) {
         const baseValues = {};
         channels.forEach((channel) => {
@@ -789,7 +879,9 @@ let MultichannelSchedulerCard = class MultichannelSchedulerCard extends i {
         };
     }
     getCardSize() {
-        return 8;
+        const scale = Number(this.config.chart_scale ?? 1);
+        const normalized = Number.isFinite(scale) ? Math.max(0.8, Math.min(2, scale)) : 1;
+        return Math.max(8, Math.round(8 * normalized));
     }
 };
 __decorate([

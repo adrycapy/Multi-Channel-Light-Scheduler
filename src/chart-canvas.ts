@@ -4,10 +4,8 @@ import { customElement, property, state } from "lit/decorators.js";
 import { ChannelConfig, ScheduleNode } from "./types";
 
 const WIDTH = 1200;
-const HEIGHT = 420;
-const PADDING = { left: 52, right: 18, top: 20, bottom: 34 };
-const PLOT_WIDTH = WIDTH - PADDING.left - PADDING.right;
-const PLOT_HEIGHT = HEIGHT - PADDING.top - PADDING.bottom;
+const BASE_HEIGHT = 420;
+const BASE_PADDING = { left: 52, right: 18, top: 20, bottom: 34 };
 const MAX_SECONDS = 24 * 60 * 60 - 1;
 
 @customElement("multichannel-chart-canvas")
@@ -16,6 +14,7 @@ export class MultichannelChartCanvas extends LitElement {
   @property({ attribute: false }) nodes: ScheduleNode[] = [];
   @property({ type: Number }) selectedIndex = -1;
   @property({ type: Number }) activeChannelId = 1;
+  @property({ type: Number }) chartScale = 1;
 
   @state() private dragIndex = -1;
 
@@ -76,7 +75,7 @@ export class MultichannelChartCanvas extends LitElement {
   override render() {
     return html`
       <svg
-        viewBox="0 0 ${WIDTH} ${HEIGHT}"
+        viewBox="0 0 ${WIDTH} ${this.chartHeight}"
         @click=${this.onBackgroundClick}
         role="img"
         aria-label="Multichannel light scheduler chart"
@@ -89,22 +88,26 @@ export class MultichannelChartCanvas extends LitElement {
   private renderGrid() {
     const rows = 5;
     const cols = 12;
+    const padding = this.padding;
+    const plotHeight = this.plotHeight;
+    const plotWidth = this.plotWidth;
+    const chartHeight = this.chartHeight;
 
     return svg`
       ${Array.from({ length: rows + 1 }, (_, i) => {
-        const y = PADDING.top + (PLOT_HEIGHT / rows) * i;
+        const y = padding.top + (plotHeight / rows) * i;
         const label = 100 - Math.round((100 / rows) * i);
         return svg`
-          <line class="grid" x1="${PADDING.left}" y1="${y}" x2="${WIDTH - PADDING.right}" y2="${y}"></line>
-          <text class="axis-label" x="${PADDING.left - 8}" y="${y + 4}" text-anchor="end">${label}%</text>
+          <line class="grid" x1="${padding.left}" y1="${y}" x2="${WIDTH - padding.right}" y2="${y}"></line>
+          <text class="axis-label" x="${padding.left - 8}" y="${y + 4}" text-anchor="end">${label}%</text>
         `;
       })}
       ${Array.from({ length: cols + 1 }, (_, i) => {
-        const x = PADDING.left + (PLOT_WIDTH / cols) * i;
+        const x = padding.left + (plotWidth / cols) * i;
         const hour = String((24 / cols) * i).padStart(2, "0");
         return svg`
-          <line class="grid" x1="${x}" y1="${PADDING.top}" x2="${x}" y2="${PADDING.top + PLOT_HEIGHT}"></line>
-          <text class="axis-label" x="${x}" y="${HEIGHT - 10}" text-anchor="middle">${hour}:00</text>
+          <line class="grid" x1="${x}" y1="${padding.top}" x2="${x}" y2="${padding.top + plotHeight}"></line>
+          <text class="axis-label" x="${x}" y="${chartHeight - 10}" text-anchor="middle">${hour}:00</text>
         `;
       })}
     `;
@@ -330,29 +333,60 @@ export class MultichannelChartCanvas extends LitElement {
   private pointerToChart(svgElement: SVGSVGElement, clientX: number, clientY: number): { x: number; y: number } {
     const rect = svgElement.getBoundingClientRect();
     const x = ((clientX - rect.left) / rect.width) * WIDTH;
-    const y = ((clientY - rect.top) / rect.height) * HEIGHT;
+    const y = ((clientY - rect.top) / rect.height) * this.chartHeight;
     return { x, y };
   }
 
   private secondsToX(seconds: number): number {
-    return PADDING.left + (Math.max(0, Math.min(MAX_SECONDS, seconds)) / MAX_SECONDS) * PLOT_WIDTH;
+    return this.padding.left + (Math.max(0, Math.min(MAX_SECONDS, seconds)) / MAX_SECONDS) * this.plotWidth;
   }
 
   private xToSeconds(x: number): number {
-    const clampedX = Math.max(PADDING.left, Math.min(WIDTH - PADDING.right, x));
-    const ratio = (clampedX - PADDING.left) / PLOT_WIDTH;
+    const clampedX = Math.max(this.padding.left, Math.min(WIDTH - this.padding.right, x));
+    const ratio = (clampedX - this.padding.left) / this.plotWidth;
     return Math.round(ratio * MAX_SECONDS);
   }
 
   private valueToY(value: number): number {
     const clamped = Math.max(0, Math.min(100, value));
-    return PADDING.top + ((100 - clamped) / 100) * PLOT_HEIGHT;
+    return this.padding.top + ((100 - clamped) / 100) * this.plotHeight;
   }
 
   private yToValue(y: number): number {
-    const clampedY = Math.max(PADDING.top, Math.min(PADDING.top + PLOT_HEIGHT, y));
-    const ratio = (clampedY - PADDING.top) / PLOT_HEIGHT;
+    const clampedY = Math.max(this.padding.top, Math.min(this.padding.top + this.plotHeight, y));
+    const ratio = (clampedY - this.padding.top) / this.plotHeight;
     return Math.max(0, Math.min(100, Math.round(100 - ratio * 100)));
+  }
+
+  private get normalizedScale(): number {
+    const scale = Number(this.chartScale);
+    if (!Number.isFinite(scale)) {
+      return 1;
+    }
+
+    return Math.max(0.8, Math.min(2, scale));
+  }
+
+  private get chartHeight(): number {
+    return Math.round(BASE_HEIGHT * this.normalizedScale);
+  }
+
+  private get padding(): { left: number; right: number; top: number; bottom: number } {
+    const scale = this.normalizedScale;
+    return {
+      left: BASE_PADDING.left * scale,
+      right: BASE_PADDING.right * scale,
+      top: BASE_PADDING.top * scale,
+      bottom: BASE_PADDING.bottom * scale,
+    };
+  }
+
+  private get plotWidth(): number {
+    return WIDTH - this.padding.left - this.padding.right;
+  }
+
+  private get plotHeight(): number {
+    return this.chartHeight - this.padding.top - this.padding.bottom;
   }
 
   private timeToSeconds(time: string): number {

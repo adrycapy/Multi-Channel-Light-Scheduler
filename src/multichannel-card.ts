@@ -58,6 +58,7 @@ export class MultichannelSchedulerCard extends LitElement {
             .nodes=${this.nodes}
             .selectedIndex=${this.selectedIndex}
             .activeChannelId=${this.activeChannelId}
+            .chartScale=${this.config.chart_scale ?? 1}
             @nodes-changed=${this.onNodesChanged}
             @node-selected=${this.onNodeSelected}
           ></multichannel-chart-canvas>
@@ -232,18 +233,42 @@ export class MultichannelSchedulerCard extends LitElement {
       const payload = (await this.hass.callWS({ type: WS_GET_CONFIG })) as SchedulerPayload;
       const backendChannels = payload.config?.channels ?? [];
       const backendNodes = payload.nodes ?? [];
+      const configChannels = (this.config.channels ?? []).slice().sort((a, b) => a.id - b.id);
 
-      if (backendChannels.length > 0) {
+      // YAML card configuration is the source of truth for channel definitions.
+      if (configChannels.length > 0) {
+        const normalizedNodes = this.normalizeNodesForChannels(
+          backendNodes.length > 0 ? backendNodes : this.defaultNodes(configChannels),
+          configChannels
+        );
+
+        this.channels = configChannels;
+        this.nodes = normalizedNodes;
+
+        if (
+          !this.areChannelsEqual(backendChannels, configChannels) ||
+          !this.areNodesCompatibleWithChannels(backendNodes, configChannels)
+        ) {
+          await this.savePayload({
+            version: 1,
+            config: { channels: configChannels },
+            nodes: normalizedNodes,
+          });
+        }
+      } else if (backendChannels.length > 0) {
         this.channels = backendChannels;
+        this.nodes = this.normalizeNodes(backendNodes.length > 0 ? backendNodes : this.defaultNodes(backendChannels));
       } else if (this.channels.length > 0) {
+        const fallbackNodes = this.defaultNodes(this.channels);
+        this.nodes = fallbackNodes;
         await this.savePayload({
           version: 1,
           config: { channels: this.channels },
-          nodes: this.defaultNodes(this.channels),
+          nodes: fallbackNodes,
         });
+      } else {
+        this.nodes = [];
       }
-
-      this.nodes = this.normalizeNodes(backendNodes.length > 0 ? backendNodes : this.defaultNodes(this.channels));
 
       if (this.channels.length > 0) {
         const hasActive = this.channels.some((channel) => channel.id === this.activeChannelId);
@@ -294,6 +319,51 @@ export class MultichannelSchedulerCard extends LitElement {
     return normalized;
   }
 
+  private normalizeNodesForChannels(nodes: ScheduleNode[], channels: ChannelConfig[]): ScheduleNode[] {
+    const channelKeys = channels.map((channel) => String(channel.id));
+    return this.normalizeNodes(nodes).map((node) => {
+      const values: Record<string, number> = {};
+      for (const key of channelKeys) {
+        const raw = Number(node.values[key] ?? 0);
+        values[key] = Math.max(0, Math.min(100, Math.round(Number.isFinite(raw) ? raw : 0)));
+      }
+      return {
+        time: node.time,
+        values,
+      };
+    });
+  }
+
+  private areChannelsEqual(a: ChannelConfig[], b: ChannelConfig[]): boolean {
+    if (a.length !== b.length) {
+      return false;
+    }
+
+    const sa = a.slice().sort((x, y) => x.id - y.id);
+    const sb = b.slice().sort((x, y) => x.id - y.id);
+
+    return sa.every((channel, index) => {
+      const other = sb[index];
+      return (
+        channel.id === other.id &&
+        channel.entity_id === other.entity_id &&
+        channel.name === other.name &&
+        channel.color.toUpperCase() === other.color.toUpperCase()
+      );
+    });
+  }
+
+  private areNodesCompatibleWithChannels(nodes: ScheduleNode[], channels: ChannelConfig[]): boolean {
+    const keys = new Set(channels.map((channel) => String(channel.id)));
+    return nodes.every((node) => {
+      const nodeKeys = Object.keys(node.values ?? {});
+      if (nodeKeys.length !== keys.size) {
+        return false;
+      }
+      return nodeKeys.every((key) => keys.has(String(key)));
+    });
+  }
+
   private defaultNodes(channels: ChannelConfig[]): ScheduleNode[] {
     const baseValues: Record<string, number> = {};
     channels.forEach((channel) => {
@@ -336,7 +406,9 @@ export class MultichannelSchedulerCard extends LitElement {
   }
 
   public getCardSize(): number {
-    return 8;
+    const scale = Number(this.config.chart_scale ?? 1);
+    const normalized = Number.isFinite(scale) ? Math.max(0.8, Math.min(2, scale)) : 1;
+    return Math.max(8, Math.round(8 * normalized));
   }
 }
 

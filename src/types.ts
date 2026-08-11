@@ -23,6 +23,7 @@ export interface CardConfig {
   title?: string;
   channels?: ChannelConfig[];
   active_channel_id?: number;
+  chart_scale?: number;
 }
 
 export interface CanvasState {
