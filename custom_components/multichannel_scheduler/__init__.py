@@ -39,9 +39,9 @@ async def _async_register_frontend_resource(hass: HomeAssistant) -> None:
     if domain_data.get("frontend_registered"):
         return
 
-    static_dir = Path(__file__).resolve().parents[2] / "dist"
+    static_dir = Path(__file__).resolve().parent / "www"
     if not static_dir.exists():
-        _LOGGER.warning("Frontend dist folder not found: %s", static_dir)
+        _LOGGER.warning("Frontend static folder not found: %s", static_dir)
         return
 
     await hass.http.async_register_static_paths(

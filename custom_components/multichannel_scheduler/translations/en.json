@@ -1,0 +1,17 @@
+{
+  "title": "Multichannel Light Scheduler",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Multichannel Light Scheduler",
+        "description": "Create the scheduler integration instance.",
+        "data": {
+          "name": "Name"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only a single instance is allowed."
+    }
+  }
+}

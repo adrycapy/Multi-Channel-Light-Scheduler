@@ -4,7 +4,7 @@ import typescript from "@rollup/plugin-typescript";
 export default {
   input: "src/index.ts",
   output: {
-    file: "dist/multichannel-scheduler-card.js",
+    file: "custom_components/multichannel_scheduler/www/multichannel-scheduler-card.js",
     format: "es",
     sourcemap: false,
   },

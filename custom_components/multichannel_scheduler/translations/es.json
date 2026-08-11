@@ -1,0 +1,17 @@
+{
+  "title": "Programador de Luces Multicanal",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurar Programador de Luces Multicanal",
+        "description": "Crea la instancia de la integración.",
+        "data": {
+          "name": "Nombre"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Solo se permite una única instancia."
+    }
+  }
+}

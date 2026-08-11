@@ -25,7 +25,7 @@ Integracion personalizada para Home Assistant que permite controlar de 1 a 10 ca
 
 - `custom_components/multichannel_scheduler/`
 - `src/` (TypeScript + Lit)
-- `dist/multichannel-scheduler-card.js`
+- `custom_components/multichannel_scheduler/www/multichannel-scheduler-card.js`
 
 ## Instalacion en HACS (modo custom repository)
 
@@ -46,7 +46,7 @@ npm install
 npm run build
 ```
 
-Esto genera `dist/multichannel-scheduler-card.js`.
+Esto genera `custom_components/multichannel_scheduler/www/multichannel-scheduler-card.js`.
 
 ## Uso en Lovelace
 
@@ -82,4 +82,8 @@ active_channel_id: 1
 ## Desarrollo local rapido
 
 - Backend: copia `custom_components/multichannel_scheduler` dentro de tu `/config/custom_components/`.
-- Frontend: compila con `npm run build` y asegurate de que `dist/multichannel-scheduler-card.js` exista.
+- Frontend: compila con `npm run build` y asegurate de que `custom_components/multichannel_scheduler/www/multichannel-scheduler-card.js` exista.
+
+## Revision de calidad
+
+- Checklist de revision HACS: `HACS_REVIEW_CHECKLIST.md`
